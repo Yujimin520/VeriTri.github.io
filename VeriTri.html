@@ -1,1 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriTri | Lost & Found Hub | University of the Cordilleras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; rounded: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans antialiased text-slate-800" x-data="lostAndFoundApp()">
 
+    <div class="fixed top-5 right-5 z-[100] space-y-3 max-w-sm w-full">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div x-transition class="p-4 rounded-xl shadow-xl border flex items-start gap-3 bg-white"
+                 :class="toast.type === 'success' ? 'border-emerald-500 text-emerald-900' : 'border-blue-500 text-blue-900'">
+                <i class="fa-solid mt-0.5" :class="toast.type === 'success' ? 'fa-circle-check text-emerald-600' : 'fa-circle-info text-blue-600'"></i>
+                <div class="flex-1">
+                    <p class="font-bold text-sm" x-text="toast.title"></p>
+                    <p class="text-xs opacity-80 mt-0.5" x-text="toast.message"></p>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <div class="min-h-screen flex flex-col" x-cloak>
+        
+        <template x-if="!isAuthenticated">
+            <div class="flex-1 flex items-center justify-center px-4 py-12 bg-slate-100 min-h-screen">
+                <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-200">
+                    <div class="text-center mb-8">
+                        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">VeriTri Registration</h1>
+                    </div>
+
+                    <div x-show="authView === 'login'">
+                        <form @submit.prevent="handleLogin()">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Username</label>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-user absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input type="text" x-model="loginForm.username" required placeholder="Enter username" class="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-lock absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input :type="showLoginPassword ? 'text' : 'password'" x-model="loginForm.password" required placeholder="Enter password" class="w-full pl-11 pr-12 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                                        <button type="button" @click="showLoginPassword = !showLoginPassword" class="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition focus:outline-none">
+                                            <i class="fa-solid" :class="showLoginPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md">
+                                Sign In
+                            </button>
+                        </form>
+                        <p class="text-center text-sm text-gray-600 mt-6">
+                            Don't have an account? 
+                            <button @click="authView = 'register'" class="text-emerald-600 font-semibold hover:underline">Register here</button>
+                        </p>
+                    </div>
+
+                    <div x-show="authView === 'register'">
+                        <form @submit.prevent="handleRegister()">
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="block text-sm font-semibold text-gray-700">Username</label>
+                                        <span x-show="isUsernameTaken()" class="text-xs text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded animate-pulse">
+                                            <i class="fa-solid fa-triangle-exclamation mr-1"></i>Already used
+                                        </span>
+                                    </div>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-user absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input type="text" x-model="registerForm.username" required placeholder="Choose a unique username" 
+                                               :class="isUsernameTaken() ? 'border-red-400 ring-red-100 focus:ring-red-400 focus:border-red-400' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
+                                               class="w-full pl-11 pr-4 py-2.5 border rounded-xl focus:ring-2 outline-none transition">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="block text-sm font-semibold text-gray-700">Mobile Contact Number</label>
+                                        <span x-show="isNumberInvalid()" class="text-xs text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded animate-pulse">
+                                            <i class="fa-solid fa-phone-slash mr-1"></i>Invalid PH format
+                                        </span>
+                                    </div>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-phone absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input type="tel" x-model="registerForm.number" @input="cleanNumberInput" maxlength="11" required placeholder="e.g., 09992156752" 
+                                               :class="isNumberInvalid() ? 'border-red-400 ring-red-100 focus:ring-red-400 focus:border-red-400' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
+                                               class="w-full pl-11 pr-4 py-2.5 border rounded-xl focus:ring-2 outline-none transition">
+                                    </div>
+                                    <p class="text-[11px] text-gray-400 mt-1">Must be an 11-digit number starting with 09.</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-lock absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input :type="showRegisterPassword ? 'text' : 'password'" x-model="registerForm.password" required placeholder="Create secure password" class="w-full pl-11 pr-12 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                                        <button type="button" @click="showRegisterPassword = !showRegisterPassword" class="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition focus:outline-none">
+                                            <i class="fa-solid" :class="showRegisterPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" :disabled="isUsernameTaken() || isNumberInvalid() || !registerForm.number" 
+                                    :class="(isUsernameTaken() || isNumberInvalid() || !registerForm.number) ? 'bg-gray-400 cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700'" 
+                                    class="w-full mt-6 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md">
+                                Complete Registration
+                            </button>
+                        </form>
+                        <p class="text-center text-sm text-gray-600 mt-6">
+                            Already registered? 
+                            <button @click="authView = 'login'; showRegisterPassword = false;" class="text-emerald-600 font-semibold hover:underline">Log in</button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="isAuthenticated">
+            <div class="contents">
+                
+                <header class="bg-emerald-600 border-b border-emerald-700 sticky top-0 z-50 shadow-md">
+                    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                        <div class="flex items-center gap-3 cursor-pointer" @click="currentPage = 'dashboard'">
+                            <div class="text-white">
+                                <span class="font-bold text-xl tracking-tight block leading-none">VeriTri</span>
+                                <span class="text-[10px] text-emerald-200 tracking-wider font-semibold">UNIVERSITY OF THE CORDILLERAS</span>
+                            </div>
+                        </div>
+                        
+                        <nav class="hidden md:flex items-center gap-1 text-white font-medium text-sm">
+                            <button @click="currentPage = 'dashboard'" :class="currentPage === 'dashboard' ? 'bg-emerald-700/60' : ''" class="px-3 py-2 rounded-xl transition">Dashboard</button>
+                            <button @click="currentPage = 'foundList'" :class="currentPage === 'foundList' ? 'bg-emerald-700/60' : ''" class="px-3 py-2 rounded-xl transition">Item Registry</button>
+                            <button @click="currentPage = 'adminReview'" :class="currentPage === 'adminReview' ? 'bg-emerald-700/60' : ''" class="px-3 py-2 rounded-xl transition flex items-center gap-2">
+                                Admin Desk <span class="bg-amber-400 text-slate-950 font-bold px-1.5 py-0.5 rounded-full text-[10px]" x-text="items.filter(i => i.status === 'Pending').length"></span>
+                            </button>
+                            <button @click="currentPage = 'aiMatcher'" :class="currentPage === 'aiMatcher' ? 'bg-emerald-700/60' : ''" class="px-3 py-2 rounded-xl transition text-yellow-300 font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> UC SmartMatch</button>
+                        </nav>
+
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3 bg-emerald-700/50 backdrop-blur-sm border border-emerald-500/30 py-1.5 px-4 rounded-full">
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                                <span class="text-sm font-medium text-white" x-text="`Logged as: ${currentUser.username}`"></span>
+                            </div>
+                            <button @click="handleLogout()" class="text-xs font-semibold bg-emerald-800 text-emerald-100 hover:bg-emerald-900 transition py-2 px-3 rounded-xl flex items-center gap-1">
+                                <i class="fa-solid fa-right-from-bracket"></i> Logout
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
+                    
+                    <div x-show="currentPage === 'dashboard'">
+                        <div class="text-center mb-10">
+                            <h2 class="text-3xl font-bold text-gray-900">Welcome to VeriTri Hub</h2>
+                            <p class="text-gray-500 mt-2">The authorized internal safety repository tracking lost assets across UC campuses.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                            <div @click="openReportForm('Lost')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:border-red-500 hover:shadow-md transition cursor-pointer group text-center">
+                                <div class="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-red-600 group-hover:text-white transition">
+                                    <i class="fa-solid fa-search text-lg"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-900 mb-1">I Lost Something</h3>
+                                <p class="text-xs text-gray-500">Log an item you are looking for at UC.</p>
+                            </div>
+
+                            <div @click="openReportForm('Found')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:border-emerald-500 hover:shadow-md transition cursor-pointer group text-center">
+                                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-600 group-hover:text-white transition">
+                                    <i class="fa-solid fa-bullhorn text-lg"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-900 mb-1">I Found an Item</h3>
+                                <p class="text-xs text-gray-500">Hand over or file an asset safely.</p>
+                            </div>
+
+                            <div @click="currentPage = 'foundList'" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:border-blue-500 hover:shadow-md transition cursor-pointer group text-center">
+                                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-600 group-hover:text-white transition">
+                                    <i class="fa-solid fa-layer-group text-lg"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-900 mb-1">Search Registry</h3>
+                                <p class="text-xs text-gray-500">Filter through all active listings on campus.</p>
+                            </div>
+
+                            <div @click="currentPage = 'aiMatcher'" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:border-yellow-500 hover:shadow-md transition cursor-pointer group text-center relative overflow-hidden">
+                                <div class="absolute -top-1 -right-1 bg-yellow-400 text-[9px] font-black px-2 py-0.5 rounded-bl-lg tracking-wider">SMART</div>
+                                <div class="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-yellow-500 group-hover:text-white transition">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                                </div>
+                                <h3 class="font-bold text-gray-900 mb-1">UC SmartMatch</h3>
+                                <p class="text-xs text-gray-500">Automated structural matching analysis.</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-gray-200 pt-10">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-xl font-bold text-gray-900">Live Campus Feed</h3>
+                                <span class="text-xs font-semibold bg-gray-200 text-gray-700 px-3 py-1 rounded-full" x-text="`${items.filter(i => i.status === 'Approved').length} Public Items Verified`"></span>
+                            </div>
+                            
+                            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <template x-for="item in items.filter(i => i.status === 'Approved').slice(0, 3)" :key="item.id">
+                                    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col justify-between group hover:shadow-md transition">
+                                        <div>
+                                            <div class="relative h-40 bg-slate-100 flex items-center justify-center overflow-hidden border-b border-gray-100">
+                                                <img :src="item.photo" class="object-cover w-full h-full group-hover:scale-105 transition duration-300" alt="Item Image">
+                                                <div class="absolute top-3 left-3 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider uppercase shadow"
+                                                     :class="item.type === 'Found' ? 'bg-emerald-50 text-white' : 'bg-rose-50 text-white'" x-text="item.type"></div>
+                                                <div class="absolute bottom-3 right-3 bg-slate-900/70 backdrop-blur-sm text-white px-2 py-1 rounded text-[10px] flex items-center gap-1">
+                                                    <i class="fa-solid fa-map-marker-alt"></i> <span x-text="item.geotag"></span>
+                                                </div>
+                                            </div>
+                                            <div class="p-5">
+                                                <h4 class="font-bold text-gray-900 text-lg mb-1" x-text="item.name"></h4>
+                                                <p class="text-xs font-semibold text-emerald-600 mb-3"><i class="fa-solid fa-university mr-1"></i> <span x-text="item.school"></span></p>
+                                                <p class="text-sm text-gray-600 line-clamp-2" x-text="item.description"></p>
+                                            </div>
+                                        </div>
+                                        <div class="p-5 pt-0">
+                                            <div class="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+                                                <span x-text="item.date"></span>
+                                                <button class="text-emerald-600 font-bold hover:underline" @click="viewItemDetails(item)">Interact & Claim &rarr;</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="currentPage === 'reportForm'" class="max-w-2xl mx-auto">
+                        <button @click="currentPage = 'dashboard'" class="mb-6 flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+                        </button>
+
+                        <div class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
+                            <h2 class="text-2xl font-bold text-slate-900 mb-1" x-text="`Report a ${formData.type} Item`"></h2>
+                            <p class="text-slate-500 text-xs mb-6">Logs will go through security queue approval before being made public.</p>
+                            
+                            <form @submit.prevent="submitReport()">
+                                <div class="space-y-5">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Item Category / Title</label>
+                                            <input type="text" x-model="formData.name" required placeholder="e.g., Black Leather Wallet" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition text-sm">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Campus / Institution</label>
+                                            <input type="text" x-model="formData.school" readonly class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl text-sm">
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Item Photo Evidence</label>
+                                        <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center bg-slate-50 hover:bg-slate-100 transition relative">
+                                            <input type="file" @change="simulatePhotoUpload" class="absolute inset-0 opacity-0 cursor-pointer">
+                                            <div x-show="!formData.photo" class="space-y-1">
+                                                <i class="fa-solid fa-camera text-slate-400 text-2xl"></i>
+                                                <p class="text-xs text-slate-600 font-medium">Click to capture or attach a preview</p>
+                                                <p class="text-[10px] text-slate-400">PNG, JPG formats verified natively</p>
+                                            </div>
+                                            <div x-show="formData.photo" class="flex items-center justify-center gap-3">
+                                                <img :src="formData.photo" class="w-16 h-16 rounded-lg object-cover border" alt="Uploaded Thumbnail">
+                                                <div class="text-left">
+                                                    <p class="text-xs font-bold text-emerald-600"><i class="fa-solid fa-circle-check"></i> Image Uploaded</p>
+                                                    <p class="text-[10px] text-slate-400">Simulated encryption hash stored</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">UC Campus Geotag Location</label>
+                                        <select x-model="formData.geotag" required class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition text-sm">
+                                            <option value="UC Main - Cafeteria">UC Main - Cafeteria</option>
+                                            <option value="UC Main - Gym Court">UC Main - Gym Court</option>
+                                            <option value="UC Main - Library Study Hall">UC Main - Library Study Hall</option>
+                                            <option value="UC Main - Campo Libertad Entrance">UC Main - Campo Libertad Entrance</option>
+                                            <option value="UC Main - Science Laboratory Complex">UC Main - Science Laboratory Complex</option>
+                                        </select>
+                                        
+                                        <div class="mt-2 bg-slate-900 text-slate-400 rounded-xl p-3 text-[11px] font-mono flex items-center justify-between border border-slate-800">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                                <span>GPS Fix Lock: <span class="text-white" x-text="`16.4124° N, 120.5982° E (${formData.geotag})`"></span></span>
+                                            </div>
+                                            <span class="text-slate-500">UC-GEOTAG v2.6</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Detailed Description</label>
+                                        <textarea x-model="formData.description" required rows="3" placeholder="Provide precise descriptions safely (e.g. keychains, brand details, context logs)..." class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition text-sm"></textarea>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition shadow-md text-sm">
+                                    File Submittal to Safety Desk
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div x-show="currentPage === 'foundList'">
+                        <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-900">Campus Asset Registry</h2>
+                                <p class="text-gray-500 text-xs mt-1">Filter listings across the active University database architecture.</p>
+                            </div>
+                            
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <div class="relative">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                                    <input type="text" x-model="searchQuery" placeholder="Search item keyword..." class="pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 w-48">
+                                </div>
+                                <select x-model="filterType" class="px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none bg-white">
+                                    <option value="All">All Classifications</option>
+                                    <option value="Lost">Lost Catalog</option>
+                                    <option value="Found">Found Catalog</option>
+                                </select>
+                                <select x-model="filterGeotag" class="px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none bg-white max-w-[150px]">
+                                    <option value="All">All Locations</option>
+                                    <option value="Cafeteria">Cafeteria</option>
+                                    <option value="Gym Court">Gym Court</option>
+                                    <option value="Library">Library</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <template x-for="item in filteredItems()" :key="item.id">
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative flex flex-col justify-between group hover:border-emerald-500 transition">
+                                    <div>
+                                        <div class="flex items-start justify-between gap-2 mb-3">
+                                            <div class="flex items-center gap-3">
+                                                <img :src="item.photo" class="w-14 h-14 object-cover rounded-xl border shadow-sm">
+                                                <div>
+                                                    <h3 class="font-bold text-slate-900 text-base group-hover:text-emerald-600 transition" x-text="item.name"></h3>
+                                                    <span class="px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase inline-block mt-0.5"
+                                                          :class="item.type === 'Found' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" x-text="item.type"></span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="text-center bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex flex-col items-center">
+                                                <i class="fa-solid fa-qrcode text-slate-800 text-xl"></i>
+                                                <span class="text-[8px] font-mono text-slate-500 mt-0.5" x-text="`TAG-${item.id.toString().slice(-4)}`"></span>
+                                            </div>
+                                        </div>
+
+                                        <p class="text-xs text-slate-600 font-medium mb-1"><i class="fa-solid fa-map-pin text-slate-400 mr-1"></i> Location: <span class="text-slate-900" x-text="item.geotag"></span></p>
+                                        <p class="text-xs text-slate-600 line-clamp-2 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100" x-text="item.description"></p>
+                                    </div>
+
+                                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                                        <span class="text-slate-400">Reporter: <span class="text-slate-700 font-bold" x-text="item.reporterName"></span></span>
+                                        <button @click="viewItemDetails(item)" class="text-emerald-600 font-bold hover:underline flex items-center gap-1">
+                                            <i class="fa-solid fa-comments"></i> Initiate Verification &rarr;
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="currentPage === 'adminReview'">
+                        <div class="mb-8">
+                            <h2 class="text-2xl font-bold text-slate-900">Admin Review Desk</h2>
+                            <p class="text-slate-500 text-xs mt-1">Verification queue managed by University of the Cordilleras Safety & Security Administrators.</p>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-100 text-slate-600 uppercase font-bold border-b border-slate-200">
+                                            <th class="p-4">Item Target</th>
+                                            <th class="p-4">Type</th>
+                                            <th class="p-4">Filer</th>
+                                            <th class="p-4">Geotag Area</th>
+                                            <th class="p-4">Status Node</th>
+                                            <th class="p-4 text-right">Moderation Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="item in items" :key="item.id">
+                                            <tr class="hover:bg-slate-50/80 transition">
+                                                <td class="p-4 font-bold text-slate-900 flex items-center gap-2">
+                                                    <img :src="item.photo" class="w-7 h-7 object-cover rounded border">
+                                                    <span x-text="item.name"></span>
+                                                </td>
+                                                <td class="p-4">
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                                                          :class="item.type === 'Found' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'" x-text="item.type"></span>
+                                                </td>
+                                                <td class="p-4 font-medium" x-text="item.reporterName"></td>
+                                                <td class="p-4 text-slate-500" x-text="item.geotag"></td>
+                                                <td class="p-4">
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                                                          :class="{
+                                                            'bg-amber-100 text-amber-800': item.status === 'Pending',
+                                                            'bg-emerald-100 text-emerald-800': item.status === 'Approved',
+                                                            'bg-blue-100 text-blue-800': item.status === 'Resolved'
+                                                          }" x-text="item.status"></span>
+                                                </td>
+                                                <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                                                    <template x-if="item.status === 'Pending'">
+                                                        <div class="inline-block">
+                                                            <button @click="approveItem(item.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-md transition">Approve</button>
+                                                        </div>
+                                                    </template>
+                                                    <button @click="viewItemDetails(item)" class="border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold px-2.5 py-1 rounded-md transition">Open Desk</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="currentPage === 'aiMatcher'">
+                        <div class="mb-8">
+                            <h2 class="text-2xl font-bold text-gray-900"><i class="fa-solid fa-wand-magic-sparkles text-yellow-500"></i> UC SmartMatch System</h2>
+                            <p class="text-gray-500 text-xs mt-1">Cross-referencing reported item metadata parameters, categories, descriptions, and geotags to isolate matches.</p>
+                        </div>
+
+                        <div class="grid lg:grid-cols-3 gap-6 items-start">
+                            <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200">
+                                <h3 class="font-bold text-sm uppercase text-slate-400 tracking-wider mb-4">Run Engine Control</h3>
+                                <button @click="runMatchingEngine()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow">
+                                    <i class="fa-solid fa-arrows-rotate animate-spin" x-show="matchingEngineRunning"></i>
+                                    <span x-text="matchingEngineRunning ? 'Parsing Structural Indexes...' : 'Trigger SmartMatch Run'"></span>
+                                </button>
+                                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-[11px] text-yellow-800 leading-relaxed">
+                                    <strong>How it works:</strong> System parses text vectors and spatial tracking overlaps across active catalogs to flag potential cross-owner claims instantly.
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-2 space-y-4">
+                                <h3 class="font-bold text-base text-slate-900 flex items-center justify-between">
+                                    <span>Identified Matrix Overlaps</span>
+                                    <span class="text-xs font-mono font-normal text-slate-400">Tolerance Threshold: 70%+</span>
+                                </h3>
+
+                                <div class="space-y-3">
+                                    <template x-for="match in matches" :key="match.id">
+                                        <div class="bg-white p-5 rounded-2xl border border-slate-200 relative overflow-hidden group hover:border-yellow-400 transition">
+                                            <div class="absolute top-0 right-0 bg-yellow-400 text-slate-950 text-[10px] font-black px-3 py-1 rounded-bl-xl shadow-sm" x-text="`${match.confidence}% Structural Match`"></div>
+                                            
+                                            <div class="grid grid-cols-2 gap-4 items-center">
+                                                <div class="border-r border-slate-100 pr-2">
+                                                    <span class="text-[9px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded tracking-wider uppercase block w-max mb-1">Lost Listing</span>
+                                                    <h4 class="font-bold text-sm text-slate-900" x-text="match.lostItem.name"></h4>
+                                                    <p class="text-[11px] text-slate-400" x-text="`By ${match.lostItem.user}`"></p>
+                                                </div>
+                                                <div class="pl-2">
+                                                    <span class="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-wider uppercase block w-max mb-1">Found Listing</span>
+                                                    <h4 class="font-bold text-sm text-slate-900" x-text="match.foundItem.name"></h4>
+                                                    <p class="text-[11px] text-slate-400" x-text="`By ${match.foundItem.user}`"></p>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-4 bg-slate-50 p-2 rounded-xl text-[11px] text-slate-600 flex items-center gap-2">
+                                                <i class="fa-solid fa-circle-exclamation text-yellow-600"></i>
+                                                <span>Matched parameters: <span class="font-bold text-slate-900" x-text="match.reason"></span></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="activeItemChat" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4" x-transition>
+                        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden border border-slate-300" @click.outside="activeItemChat = null">
+                            
+                            <div class="bg-emerald-600 text-white p-4 flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center font-bold text-base border border-emerald-500 shadow-inner">
+                                        <i class="fa-solid fa-user-shield text-emerald-200"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-sm" x-text="`Security Verification Desk: ${activeItemChat?.name}`"></h4>
+                                        <p class="text-[11px] text-emerald-100" x-text="`Filer Node ID: ${activeItemChat?.reporterName} | Loc: ${activeItemChat?.geotag}`"></p>
+                                    </div>
+                                </div>
+                                <button @click="activeItemChat = null" class="text-emerald-100 hover:text-white transition">
+                                    <i class="fa-solid fa-xmark text-lg"></i>
+                                </button>
+                            </div>
+
+                            <div class="bg-slate-100 p-3 px-4 border-b border-slate-200 flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2 text-slate-600">
+                                    <span class="font-bold">Workflow Status:</span>
+                                    <span class="px-2 py-0.5 rounded font-black text-[10px] uppercase"
+                                          :class="activeItemChat?.status === 'Pending' ? 'bg-amber-200 text-amber-900' : activeItemChat?.status === 'Approved' ? 'bg-emerald-200 text-emerald-900' : 'bg-blue-200 text-blue-900'"
+                                          x-text="activeItemChat?.status"></span>
+                                </div>
+                                <div class="flex items-center gap-1 text-slate-500 font-mono text-[10px]">
+                                    <i class="fa-solid fa-qrcode"></i> <span x-text="`TAG-${activeItemChat?.id.toString().slice(-4)}`"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4 bg-slate-50 flex-1 h-[260px] overflow-y-auto space-y-3 flex flex-col custom-scrollbar">
+                                <div class="bg-white p-3 rounded-xl border border-gray-100 text-xs self-start max-w-[85%] shadow-sm leading-relaxed">
+                                    <p class="text-emerald-600 text-[9px] font-black uppercase mb-1 tracking-wider">System Safety Ledger</p>
+                                    <p class="text-slate-700">Greetings! This verification sub-channel establishes secure validation routing between stakeholders and the administrative office. Please attach item validation claims cleanly.</p>
+                                </div>
+
+                                <template x-for="msg in activeMessages()" :key="msg.id">
+                                    <div :class="msg.sender === currentUser.username ? 'bg-emerald-600 text-white self-end' : 'bg-white text-gray-700 border border-slate-200 self-start'" 
+                                         class="p-3 rounded-xl text-xs max-w-[85%] shadow-sm leading-relaxed">
+                                        <p :class="msg.sender === currentUser.username ? 'text-emerald-200' : 'text-emerald-600'" class="text-[9px] font-black uppercase mb-1 tracking-wider" x-text="msg.sender"></p>
+                                        <p x-text="msg.text"></p>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="p-3 bg-white border-t border-slate-200">
+                                <template x-if="activeItemChat?.status !== 'Resolved'">
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl p-2.5">
+                                            <div class="text-[11px] text-blue-900 leading-tight">
+                                                <p class="font-bold"><i class="fa-solid fa-handshake"></i> Complete Return Cycle?</p>
+                                                <p class="opacity-80">Flags item as fully returned and archived.</p>
+                                            </div>
+                                            <button @click="triggerReturnConfirmation(activeItemChat.id)" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                                                Confirm Return
+                                            </button>
+                                        </div>
+
+                                        <form @submit.prevent="sendMessage()" class="flex gap-2">
+                                            <input type="text" x-model="newMessageText" placeholder="Type private claims log message safely..." required class="flex-1 bg-slate-100 px-4 py-2.5 rounded-xl text-xs border-none focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                            <button type="submit" class="bg-emerald-600 text-white px-4 rounded-xl text-xs font-bold hover:bg-emerald-700 transition flex items-center justify-center">
+                                                <i class="fa-solid fa-paper-plane"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </template>
+                                <template x-if="activeItemChat?.status === 'Resolved'">
+                                    <div class="bg-slate-100 rounded-xl p-3 text-center text-xs font-bold text-slate-500 flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-circle-check text-blue-600"></i> This asset case file has been closed and marked as Returned.
+                                    </div>
+                                </template>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div x-show="showSuccessModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4" x-transition>
+                        <div class="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl border border-slate-100">
+                            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                                <i class="fa-solid fa-shield-check"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-1">Report Logged Successfully</h3>
+                            <p class="text-xs text-gray-500 mb-6 leading-relaxed">The item data matrix has been queued under administrative review to prevent false assertions.</p>
+                            <button @click="acknowledgeSuccess()" class="w-full bg-slate-950 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl transition text-xs">
+                                Access Central Registry
+                            </button>
+                        </div>
+                    </div>
+
+                </main>
+            </div>
+        </template>
+    </div>
+
+    <script>
+        function lostAndFoundApp() {
+            return {
+                isAuthenticated: false,
+                authView: 'login', 
+                currentPage: 'dashboard',
+                showSuccessModal: false,
+                activeItemChat: null,
+                newMessageText: '',
+                currentUser: null,
+                
+                showLoginPassword: false,
+                showRegisterPassword: false,
+
+                searchQuery: '',
+                filterType: 'All',
+                filterGeotag: 'All',
+
+                matchingEngineRunning: false,
+                toasts: [],
+                
+                usersDatabase: [
+                    { username: 'david11', password: 'password123', number: '09111111111' },
+                    { username: 'sarah22', password: 'password123', number: '09222222222' },
+                    { username: 'adminUC', password: 'ucadminsecure', number: '09555555555' }
+                ],
+                
+                loginForm: { username: '', password: '' },
+                registerForm: { username: '', password: '', number: '' },
+                
+                formData: { name: '', school: 'University of the Cordilleras', description: '', type: 'Found', photo: '', geotag: 'UC Main - Cafeteria' },
+                
+                chatLogs: {}, 
+                
+                items: [
+                    { id: 1, name: "UC Criminology Uniform Patch", school: "University of the Cordilleras", description: "Found lying near the main counter drop line.", reporterName: "david11", date: "Yesterday", status: "Approved", type: "Found", photo: "https://images.unsplash.com/photo-1590079019458-0eb5b40a3371?w=500&auto=format&fit=crop", geotag: "UC Main - Cafeteria" },
+                    { id: 2, name: "Engineering Drawing Calculator", school: "University of the Cordilleras", description: "Left behind on a side wooden long-bench layout.", reporterName: "sarah22", date: "2 days ago", status: "Pending", type: "Lost", photo: "https://images.unsplash.com/photo-1518133680790-3985ecea3ecf?w=500&auto=format&fit=crop", geotag: "UC Main - Gym Court" }
+                ],
+
+                matches: [
+                    { id: 101, confidence: 92, reason: "Keyword overlap ('Uniform') and identical temporal cluster maps", lostItem: { name: "Lost Criminology Jacket", user: "student_alpha" }, foundItem: { name: "Found Uniform Outerwear", user: "security_desk" } }
+                ],
+
+                pushToast(title, message, type = 'success') {
+                    const id = Date.now();
+                    this.toasts.push({ id, title, message, type });
+                    setTimeout(() => {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 4000);
+                },
+
+                isUsernameTaken() {
+                    const candidate = this.registerForm.username.trim().toLowerCase();
+                    if (!candidate) return false;
+                    return this.usersDatabase.some(u => u.username.toLowerCase() === candidate);
+                },
+
+                isNumberInvalid() {
+                    const num = this.registerForm.number;
+                    if (!num) return false; 
+                    const phRegex = /^09\d{9}$/;
+                    return !phRegex.test(num);
+                },
+
+                cleanNumberInput(e) {
+                    this.registerForm.number = e.target.value.replace(/\D/g, '');
+                },
+                
+                handleLogin() {
+                    const foundUser = this.usersDatabase.find(
+                        u => u.username.toLowerCase() === this.loginForm.username.trim().toLowerCase() && 
+                             u.password === this.loginForm.password
+                    );
+                    
+                    if (foundUser) {
+                        this.currentUser = foundUser;
+                        this.isAuthenticated = true;
+                        this.currentPage = 'dashboard';
+                        this.loginForm = { username: '', password: '' };
+                        this.showLoginPassword = false;
+                        this.pushToast("Access Granted", `Welcome back to the UC Hub, ${foundUser.username}!`);
+                    } else {
+                        alert("Invalid security authentication variables verified.");
+                    }
+                },
+                
+                handleRegister() {
+                    const cleanUsername = this.registerForm.username.trim();
+                    if (this.isUsernameTaken() || this.isNumberInvalid()) return;
+                    
+                    const newRegisteredProfile = {
+                        username: cleanUsername,
+                        password: this.registerForm.password,
+                        number: this.registerForm.number
+                    };
+                    
+                    this.usersDatabase.push(newRegisteredProfile);
+                    this.currentUser = newRegisteredProfile;
+                    this.isAuthenticated = true;
+                    this.currentPage = 'dashboard';
+                    
+                    this.registerForm = { username: '', password: '', number: '' };
+                    this.showRegisterPassword = false;
+                    this.pushToast("Account Setup Completed", "UC Identity nodes registered safely.");
+                },
+                
+                handleLogout() {
+                    this.isAuthenticated = false;
+                    this.currentUser = null;
+                    this.authView = 'login';
+                },
+
+                openReportForm(type) {
+                    this.formData.type = type;
+                    this.formData.name = '';
+                    this.formData.description = '';
+                    this.formData.photo = '';
+                    this.currentPage = 'reportForm';
+                },
+
+                simulatePhotoUpload(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.formData.photo = URL.createObjectURL(file);
+                        this.pushToast("Photo Handled", "Asset visual tracking telemetry loaded into application memory cache.");
+                    } else {
+                        this.formData.photo = "https://images.unsplash.com/photo-1533228891704-7fce900a02c3?w=500&auto=format&fit=crop";
+                    }
+                },
+                
+                submitReport() {
+                    if (!this.formData.photo) {
+                        this.formData.photo = "https://images.unsplash.com/photo-1533228891704-7fce900a02c3?w=500&auto=format&fit=crop";
+                    }
+                    const newItem = {
+                        id: Date.now(),
+                        name: this.formData.name,
+                        school: this.formData.school,
+                        description: this.formData.description,
+                        reporterName: this.currentUser.username,
+                        date: "Just Now",
+                        status: "Pending",
+                        type: this.formData.type,
+                        photo: this.formData.photo,
+                        geotag: this.formData.geotag
+                    };
+                    this.items.unshift(newItem);
+                    this.showSuccessModal = true;
+                },
+                
+                acknowledgeSuccess() {
+                    this.showSuccessModal = false;
+                    this.currentPage = 'foundList';
+                },
+
+                filteredItems() {
+                    return this.items.filter(item => {
+                        const matchesSearch = item.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                                              item.description.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        const matchesType = this.filterType === 'All' ? true : item.type === this.filterType;
+                        const matchesGeotag = this.filterGeotag === 'All' ? true : item.geotag.includes(this.filterGeotag);
+                        return matchesSearch && matchesType && matchesGeotag && item.status !== 'Pending';
+                    });
+                },
+
+                approveItem(id) {
+                    const target = this.items.find(i => i.id === id);
+                    if (target) {
+                        target.status = 'Approved';
+                        this.pushToast("Listing Approved", `Item configuration database validated publicly.`);
+                    }
+                },
+                
+                viewItemDetails(item) {
+                    this.activeItemChat = item;
+                    this.newMessageText = '';
+                },
+
+                activeMessages() {
+                    if (!this.activeItemChat) return [];
+                    return this.chatLogs[this.activeItemChat.id] || [];
+                },
+
+                sendMessage() {
+                    if (!this.newMessageText.trim() || !this.activeItemChat) return;
+                    
+                    const itemId = this.activeItemChat.id;
+                    if (!this.chatLogs[itemId]) {
+                        this.chatLogs[itemId] = [];
+                    }
+
+                    this.chatLogs[itemId].push({
+                        id: Date.now(),
+                        sender: this.currentUser.username,
+                        text: this.newMessageText
+                    });
+
+                    this.newMessageText = '';
+                    this.pushToast("Message Sent", "Internal claim thread sync complete.", "info");
+                },
+
+                triggerReturnConfirmation(id) {
+                    const target = this.items.find(i => i.id === id);
+                    if (target) {
+                        target.status = 'Resolved';
+                        this.activeItemChat.status = 'Resolved';
+                        this.pushToast("Case Resolved", "Ownership confirmation closed. Asset returned successfully.");
+                    }
+                },
+
+                runMatchingEngine() {
+                    this.matchingEngineRunning = true;
+                    setTimeout(() => {
+                        this.matchingEngineRunning = false;
+                        this.matches.unshift({
+                            id: Date.now(),
+                            confidence: Math.floor(Math.random() * 25) + 70,
+                            reason: "High string clustering overlap match found in " + this.formData.geotag,
+                            lostItem: { name: "Simulated Request Parameter", user: "AutoParser" },
+                            foundItem: { name: "Registry Tracking Array Hook", user: "Admin desk" }
+                        });
+                        this.pushToast("SmartMatch Recalculated", "Analysis array indexes compiled without loss errors.");
+                    }, 1500);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
